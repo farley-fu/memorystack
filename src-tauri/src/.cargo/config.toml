@@ -1,0 +1,9 @@
+'EOF'
+[target.x86_64-pc-windows-gnu]
+linker = "x86_64-w64-mingw32-gcc"
+ar = "x86_64-w64-mingw32-gcc-ar"
+
+# 如果需要，也可以配置 MSVC（但建议先用 GNU）
+[target.x86_64-pc-windows-msvc]
+linker = "x86_64-w64-mingw32-gcc"  # 尝试用 mingw 替代 MSVC 链接器
+EOF
