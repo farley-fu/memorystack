@@ -1,0 +1,77 @@
+name: Internal Test Release
+
+on:
+  push:
+    tags:
+      - v*
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            tauri_target: bundle-msi
+          - os: macos-latest
+            tauri_target: bundle-macos
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ---------- Frontend ----------
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Build frontend
+        run: |
+          npm ci
+          npm run build
+
+      # ---------- Rust / Tauri ----------
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Build Tauri App
+        env:
+          TAURI_TARGET: ${{ matrix.tauri_target }}
+          TAURI_SKIP_MACOS_SIGN: "true"
+        run: |
+          cd src-tauri
+          cargo tauri $env:TAURI_TARGET
+
+      # ---------- Upload build output ----------
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: memorystack-${{ matrix.os }}
+          path: src-tauri/target/release/bundle/
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create GitHub Release (Draft)
+        uses: ncipollo/release-action@v1
+        with:
+          draft: true
+          prerelease: true
+          allowUpdates: true
+          artifacts: |
+            artifacts/**/**/*.msi
+            artifacts/**/**/*.dmg
+            artifacts/**/**/*.zip
