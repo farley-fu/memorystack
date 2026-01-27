@@ -36,8 +36,8 @@ jobs:
         with:
           targets: x86_64-pc-windows-msvc
 
-      - name: Install Tauri CLI
-        run: cargo install tauri-cli --locked
+      # - name: Install Tauri CLI
+      #   run: cargo install tauri-cli --locked
 
       # Build macOS
       - name: Build Tauri App (macOS)
@@ -50,10 +50,19 @@ jobs:
 
       # Build Windows (关键)
       - name: Build Tauri App (Windows)
-        if: matrix.os == 'windows-latest'
-        run: |
-          cd src-tauri
-          cargo tauri build --target x86_64-pc-windows-msvc
+      if: matrix.os == 'windows-latest'
+      uses: tauri-apps/tauri-action@v0
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        projectPath: src-tauri
+        args: build
+
+      # - name: Build Tauri App (Windows)
+      #   if: matrix.os == 'windows-latest'
+      #   run: |
+      #     cd src-tauri
+      #     cargo tauri build --target x86_64-pc-windows-msvc
 
       # Upload
       - name: Upload Artifact
