@@ -1,4 +1,4 @@
-name: Build Tauri App
+name: Build All Platforms
 
 on:
   push:
@@ -21,18 +21,36 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 18
-          cache: 'npm'
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Install Tauri dependencies
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # 使用 Tauri 2.x CLI
+      - name: Install Tauri CLI
+        run: npm install @tauri-apps/cli@latest
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
         with:
-          tagName: app-v__VERSION__
-          releaseName: 'App v__VERSION__'
-          releaseBody: 'See the assets to download this version and install.'
-          releaseDraft: false
-          prerelease: false
+          toolchain: stable
+
+      # Windows 构建 - 完全不安装 WebView2
+      - name: Setup Windows for Tauri 2
+        if: matrix.platform == 'windows-latest'
+        run: |
+          echo "Tauri 2.x 在 Windows 上可能不需要 WebView2"
+          echo "跳过 WebView2 安装"
+
+      - name: Build Tauri app
+        run: npm run tauri build
+        env:
+          # 禁用一些可能导致问题的功能
+          CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+          # 设置超时
+        timeout-minutes: 30
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.platform }}-app
+          path: src-tauri/target/release/bundle/
