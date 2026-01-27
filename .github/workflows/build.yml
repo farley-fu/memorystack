@@ -1,10 +1,10 @@
-name: Build release packages
+name: Build Desktop App
 
 on:
+  workflow_dispatch:
   push:
     tags:
-      - 'v*'       # 仅在 push tag 时构建
-  workflow_dispatch: {}
+      - v*
 
 jobs:
   build:
@@ -12,50 +12,44 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: macos-latest
-            tauri_target: bundle-macos
           - os: windows-latest
             tauri_target: bundle-msi
+          - os: macos-latest
+            tauri_target: bundle-macos
 
     steps:
       - uses: actions/checkout@v4
 
-      # 1) Setup Node
+      # Node
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 18
 
-      - name: Install frontend dependencies
+      - name: Install frontend deps & build
         run: |
           npm ci
           npm run build
-        working-directory: ./
 
-      # 2) Setup Rust toolchain
+      # Rust
       - name: Setup Rust
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
           override: true
 
-      # 3) Setup Tauri dependencies
-      - name: Install Rust deps
-        run: rustup target add x86_64-pc-windows-msvc || true
-
-      # 4) Build Tauri app
-      - name: Build Tauri App
+      # Tauri build
+      - name: Build Tauri
         env:
-          TAURI_SKIP_MACOS_SIGN: 'true'  # 可选: 跳过 macOS 签名
+          TAURI_TARGET: ${{ matrix.tauri_target }}
+          TAURI_SKIP_MACOS_SIGN: 'true'
         run: |
           cd src-tauri
-          cargo build --release
-          cargo tauri ${ { matrix.tauri_target } }
+          cargo tauri $env:TAURI_TARGET
 
-      # 5) Upload artifacts
+      # Upload
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: release-${{ matrix.os }}
-          path: |
-            src-tauri/target/release/bundle/
+          name: memorystack-${{ matrix.os }}
+          path: src-tauri/target/release/bundle/
