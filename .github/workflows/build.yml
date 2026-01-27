@@ -24,7 +24,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # 安装指定版本的 Tauri CLI（避免版本冲突）
       - name: Install Tauri CLI
         run: npm install @tauri-apps/cli@1
 
@@ -33,26 +32,17 @@ jobs:
         with:
           toolchain: stable
 
-      # Windows 特定步骤 - 使用可靠的 WebView2 安装方法
-      - name: Setup Windows (简化的 WebView2 安装)
+      # Windows 步骤：只检查不安装
+      - name: Check WebView2 on Windows
         if: matrix.platform == 'windows-latest'
         run: |
-          # 方法1：使用 winget（Windows 包管理器，通常已预装）
-          winget install Microsoft.EdgeWebView2 --silent --accept-package-agreements --accept-source-agreements || echo "winget 安装失败，尝试其他方法"
-          
-          # 方法2：如果 winget 失败，使用更可靠的下载方式
-          echo "正在下载 WebView2 Evergreen Bootstrapper..."
-          curl -L -o "$RUNNER_TEMP\MicrosoftEdgeWebView2Setup.exe" "https://go.microsoft.com/fwlink/p/?LinkId=2124703"
-          
-          echo "正在安装 WebView2..."
-          start /wait "$RUNNER_TEMP\MicrosoftEdgeWebView2Setup.exe" /install /silent
-        shell: cmd  # 使用 cmd 而不是 PowerShell
+          echo "检查 WebView2 是否已安装..."
+          reg query "HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}" || echo "WebView2 注册表项未找到"
+          echo "继续构建，如果失败可能需要手动安装 WebView2"
 
       - name: Build Tauri app
         run: npm run tauri build
-        env:
-          # 设置超时时间，避免无限等待
-          TAURI_PRIVATE_KEY: ""
+        timeout-minutes: 30  # 设置超时，避免无限等待
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
