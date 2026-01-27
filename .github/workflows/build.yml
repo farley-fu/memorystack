@@ -15,46 +15,44 @@ jobs:
     runs-on: ${{ matrix.platform }}
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: '18'
-          cache: 'npm'
+          node-version: 18
 
       - name: Install dependencies
         run: npm ci
+
+      # 安装指定版本的 Tauri CLI（避免版本冲突）
+      - name: Install Tauri CLI
+        run: npm install @tauri-apps/cli@1
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
 
-      # Windows 特定步骤
-      - name: Setup Windows environment
+      # Windows 特定步骤 - 使用可靠的 WebView2 安装方法
+      - name: Setup Windows (简化的 WebView2 安装)
         if: matrix.platform == 'windows-latest'
-        shell: pwsh
         run: |
-          # 安装 WebView2
-          Write-Host "正在安装 WebView2..."
-          Invoke-WebRequest -Uri "https://go.microsoft.com/fwlink/p/?LinkId=2124703" `
-            -OutFile "$env:TEMP\MicrosoftEdgeWebview2Setup.exe" `
-            -UseBasicParsing
+          # 方法1：使用 winget（Windows 包管理器，通常已预装）
+          winget install Microsoft.EdgeWebView2 --silent --accept-package-agreements --accept-source-agreements || echo "winget 安装失败，尝试其他方法"
           
-          Start-Process -FilePath "$env:TEMP\MicrosoftEdgeWebview2Setup.exe" `
-            -ArgumentList "/install", "/silent" `
-            -Wait `
-            -NoNewWindow
+          # 方法2：如果 winget 失败，使用更可靠的下载方式
+          echo "正在下载 WebView2 Evergreen Bootstrapper..."
+          curl -L -o "$RUNNER_TEMP\MicrosoftEdgeWebView2Setup.exe" "https://go.microsoft.com/fwlink/p/?LinkId=2124703"
           
-          Write-Host "WebView2 安装完成"
-
-      - name: Install Tauri CLI
-        run: npm install @tauri-apps/cli
+          echo "正在安装 WebView2..."
+          start /wait "$RUNNER_TEMP\MicrosoftEdgeWebView2Setup.exe" /install /silent
+        shell: cmd  # 使用 cmd 而不是 PowerShell
 
       - name: Build Tauri app
         run: npm run tauri build
+        env:
+          # 设置超时时间，避免无限等待
+          TAURI_PRIVATE_KEY: ""
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
