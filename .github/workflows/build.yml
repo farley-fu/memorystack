@@ -1,4 +1,4 @@
-name: Build Tauri for Windows and macOS
+name: Cross-compile from macOS
 
 on:
   push:
@@ -6,65 +6,58 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
-    strategy:
-      matrix:
-        os: [macos-latest, windows-latest]
-        include:
-          - os: macos-latest
-            rust_target: x86_64-apple-darwin
-          - os: windows-latest
-            rust_target: x86_64-pc-windows-msvc
-
-    runs-on: ${{ matrix.os }}
-
+  cross-compile:
+    runs-on: macos-latest
+    
     steps:
       - uses: actions/checkout@v4
-
+      
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 18
-          cache: 'npm'
-
+          
       - name: Install dependencies
         run: npm ci
-
-      # 安装 Tauri 1.x CLI（最稳定）
+        
       - name: Install Tauri CLI
         run: npm install @tauri-apps/cli@1
-
-      # 安装 Rust 和指定目标
-      - name: Setup Rust
+        
+      # 安装 macOS 本机目标
+      - name: Setup Rust for macOS
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
-          target: ${{ matrix.rust_target }}
-
-      # Windows 特定设置
-      - name: Setup Windows build environment
-        if: matrix.os == 'windows-latest'
-        run: |
-          # 创建 cargo 配置，强制使用 MSVC 链接器
-          mkdir -p .cargo
-          echo '[target.x86_64-pc-windows-msvc]' > .cargo/config.toml
-          echo 'linker = "link.exe"' >> .cargo/config.toml
+          targets: x86_64-apple-darwin,aarch64-apple-darwin
           
-          # 确保 MSVC 链接器在 PATH 中
-          echo "PATH includes:"
-          echo $PATH | tr ';' '\n' | grep -i "msvc\|visualstudio" || echo "No MSVC paths found"
-
-      # 构建应用
-      - name: Build Tauri app
+      # 安装 Windows 交叉编译目标
+      - name: Install Windows cross-compile target
+        run: |
+          rustup target add x86_64-pc-windows-gnu
+          
+      # 安装 MinGW 交叉编译工具链
+      - name: Install MinGW cross-compiler
+        run: |
+          brew install mingw-w64
+          
+      # 构建 macOS 版本
+      - name: Build for macOS
         run: npm run tauri build
-        env:
-          # Windows 特定的环境变量
-          ${{ matrix.os == 'windows-latest' && 'CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER' || '' }}: ${{ matrix.os == 'windows-latest' && 'link.exe' || '' }}
-          ${{ matrix.os == 'windows-latest' && 'RUSTFLAGS' || '' }}: ${{ matrix.os == 'windows-latest' && '-C linker=link.exe' || '' }}
-
-      # 上传构建结果
-      - name: Upload artifacts
+        
+      # 交叉编译 Windows 版本
+      - name: Cross-compile for Windows
+        run: |
+          # 设置交叉编译环境变量
+          export CC_x86_64_pc_windows_gnu=x86_64-w64-mingw32-gcc
+          export CXX_x86_64_pc_windows_gnu=x86_64-w64-mingw32-g++
+          export AR_x86_64_pc_windows_gnu=x86_64-w64-mingw32-ar
+          
+          npm run tauri build -- --target x86_64-pc-windows-gnu
+          
+      - name: Upload all artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.os }}-build
-          path: src-tauri/target/release/bundle/
+          name: all-builds
+          path: |
+            src-tauri/target/release/bundle/
+            src-tauri/target/x86_64-pc-windows-gnu/release/bundle/
