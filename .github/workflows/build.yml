@@ -6,51 +6,100 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
-    strategy:
-      fail-fast: false
-      matrix:
-        platform: [macos-latest, windows-latest]
-
-    runs-on: ${{ matrix.platform }}
-
+  build-macos:
+    runs-on: macos-latest
+    
     steps:
-      - uses: actions/checkout@v4
-
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 18
-
+          node-version: '18'
+          cache: 'npm'
+          
       - name: Install dependencies
         run: npm ci
-
-      # 使用 Tauri 2.x CLI
-      - name: Install Tauri CLI
-        run: npm install @tauri-apps/cli@latest
-
-      - name: Install Rust
+        
+      - name: Install Rust (macOS)
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
-
-      # Windows 构建 - 完全不安装 WebView2
-      - name: Setup Windows for Tauri 2
-        if: matrix.platform == 'windows-latest'
-        run: |
-          echo "Tauri 2.x 在 Windows 上可能不需要 WebView2"
-          echo "跳过 WebView2 安装"
-
-      - name: Build Tauri app
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+          
+      - name: Install Tauri CLI
+        run: npm install @tauri-apps/cli@1
+        
+      - name: Build for macOS
         run: npm run tauri build
-        env:
-          # 禁用一些可能导致问题的功能
-          CARGO_NET_GIT_FETCH_WITH_CLI: "true"
-          # 设置超时
-        timeout-minutes: 30
-
-      - name: Upload artifacts
+        
+      - name: Upload macOS artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.platform }}-app
+          name: macos-app
+          path: src-tauri/target/release/bundle/
+
+  build-windows:
+    runs-on: windows-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      # 关键：安装 MSVC 工具链，而不是默认的
+      - name: Install Rust with MSVC
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          target: x86_64-pc-windows-msvc
+          
+      # 设置 MSVC 环境变量
+      - name: Setup MSVC Environment
+        uses: seanmiddleditch/gha-setup-vsdevenv@master
+        
+      # 清理可能的 MinGW 干扰
+      - name: Clean environment
+        run: |
+          # 移除 MinGW 相关的环境变量
+          echo "Cleaning environment..."
+          
+      # 安装 Tauri CLI
+      - name: Install Tauri CLI
+        run: npm install @tauri-apps/cli@1
+        
+      # 设置正确的链接器
+      - name: Configure Rust for MSVC
+        run: |
+          # 确保使用 MSVC 链接器
+          echo "Setting up MSVC linker..."
+          # 这会在项目目录创建 cargo 配置
+          mkdir -p .cargo
+          echo '[target.x86_64-pc-windows-msvc]' >> .cargo/config.toml
+          echo 'linker = "link.exe"' >> .cargo/config.toml
+          
+      # 构建应用
+      - name: Build for Windows
+        run: |
+          # 设置 MSVC 链接器环境变量
+          $env:RUSTFLAGS = "-C linker=link.exe"
+          $env:CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER = "link.exe"
+          npm run tauri build
+        env:
+          RUSTFLAGS: "-C linker=link.exe"
+          CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER: "link.exe"
+          
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-app
           path: src-tauri/target/release/bundle/
