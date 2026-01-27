@@ -1,10 +1,10 @@
 name: Internal Test Release
 
 on:
+  workflow_dispatch:
   push:
     tags:
       - v*
-  workflow_dispatch:
 
 jobs:
   build:
@@ -31,13 +31,15 @@ jobs:
           npm ci
           npm run build
 
-      # ---------- Rust / Tauri ----------
+      # ---------- Rust ----------
       - name: Setup Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
+        uses: dtolnay/rust-toolchain@stable
 
+      # ---------- Install Tauri CLI (关键！) ----------
+      - name: Install Tauri CLI
+        run: cargo install tauri-cli --locked
+
+      # ---------- Build ----------
       - name: Build Tauri App
         env:
           TAURI_TARGET: ${{ matrix.tauri_target }}
@@ -46,32 +48,9 @@ jobs:
           cd src-tauri
           cargo tauri $env:TAURI_TARGET
 
-      # ---------- Upload build output ----------
+      # ---------- Upload ----------
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: memorystack-${{ matrix.os }}
           path: src-tauri/target/release/bundle/
-
-  release:
-    needs: build
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Download Artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-
-      - name: Create GitHub Release (Draft)
-        uses: ncipollo/release-action@v1
-        with:
-          draft: true
-          prerelease: true
-          allowUpdates: true
-          artifacts: |
-            artifacts/**/**/*.msi
-            artifacts/**/**/*.dmg
-            artifacts/**/**/*.zip
