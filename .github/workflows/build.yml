@@ -3,9 +3,7 @@ name: Build All Platforms
 on:
   push:
     branches: [main]
-  release:
-    types: [created]
-  workflow_dispatch:  # 允许手动触发
+  workflow_dispatch:
 
 jobs:
   build:
@@ -13,74 +11,53 @@ jobs:
       fail-fast: false
       matrix:
         platform: [macos-latest, windows-latest]
-        include:
-          - platform: macos-latest
-            rust_target: aarch64-apple-darwin,x86_64-apple-darwin
-            artifact_name: macos-app
-            bundle_path: src-tauri/target/release/bundle/
-            
-          - platform: windows-latest
-            rust_target: x86_64-pc-windows-msvc
-            artifact_name: windows-app
-            bundle_path: src-tauri/target/release/bundle/
 
     runs-on: ${{ matrix.platform }}
 
     steps:
-      # 1. 下载代码
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2. 设置 Node.js 环境
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '18'
           cache: 'npm'
 
-      # 3. 安装前端依赖
       - name: Install dependencies
         run: npm ci
 
-      # 4. 安装 Rust
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
-          targets: ${{ matrix.rust_target }}
 
-      # 5. 平台特定设置
-      - name: Platform setup (Windows)
+      # Windows 特定步骤
+      - name: Setup Windows environment
         if: matrix.platform == 'windows-latest'
+        shell: pwsh
         run: |
-          # 安装 Windows 构建工具
-          choco install -y visualstudio2022-workload-vctools
           # 安装 WebView2
-          curl -L -o webview2.exe https://go.microsoft.com/fwlink/p/?LinkId=2124703
-          webview2.exe /install /silent
-          # 设置 MSVC 环境
-          echo "设置 MSVC 环境变量..."
+          Write-Host "正在安装 WebView2..."
+          Invoke-WebRequest -Uri "https://go.microsoft.com/fwlink/p/?LinkId=2124703" `
+            -OutFile "$env:TEMP\MicrosoftEdgeWebview2Setup.exe" `
+            -UseBasicParsing
+          
+          Start-Process -FilePath "$env:TEMP\MicrosoftEdgeWebview2Setup.exe" `
+            -ArgumentList "/install", "/silent" `
+            -Wait `
+            -NoNewWindow
+          
+          Write-Host "WebView2 安装完成"
 
-      - name: Platform setup (macOS)
-        if: matrix.platform == 'macos-latest'
-        run: |
-          # 安装 macOS 构建依赖
-          brew install create-dmg
-
-      # 6. 安装 Tauri CLI
       - name: Install Tauri CLI
         run: npm install @tauri-apps/cli
 
-      # 7. 构建应用
       - name: Build Tauri app
         run: npm run tauri build
-        env:
-          TAURI_PRIVATE_KEY: ""  # 如果不需要代码签名就留空
 
-      # 8. 上传构建产物
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact_name }}
-          path: ${{ matrix.bundle_path }}
-          retention-days: 7
+          name: ${{ matrix.platform }}-app
+          path: src-tauri/target/release/bundle/
