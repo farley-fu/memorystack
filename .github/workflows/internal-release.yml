@@ -33,17 +33,27 @@ jobs:
       # Rust
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
 
       - name: Install Tauri CLI
         run: cargo install tauri-cli --locked
 
-      # Build (关键修改)
-      - name: Build Tauri App
+      # Build macOS
+      - name: Build Tauri App (macOS)
+        if: matrix.os == 'macos-latest'
         env:
           TAURI_SKIP_MACOS_SIGN: "true"
         run: |
           cd src-tauri
           cargo tauri build
+
+      # Build Windows (关键)
+      - name: Build Tauri App (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          cd src-tauri
+          cargo tauri build --target x86_64-pc-windows-msvc
 
       # Upload
       - name: Upload Artifact
