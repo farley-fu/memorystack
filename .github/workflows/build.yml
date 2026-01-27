@@ -1,4 +1,4 @@
-name: Build All Platforms
+name: Build Tauri App
 
 on:
   push:
@@ -17,35 +17,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: 18
+          cache: 'npm'
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Install Tauri CLI
-        run: npm install @tauri-apps/cli@1
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+      - name: Install Tauri dependencies
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          toolchain: stable
-
-      # Windows 步骤：只检查不安装
-      - name: Check WebView2 on Windows
-        if: matrix.platform == 'windows-latest'
-        run: |
-          echo "检查 WebView2 是否已安装..."
-          reg query "HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}" || echo "WebView2 注册表项未找到"
-          echo "继续构建，如果失败可能需要手动安装 WebView2"
-
-      - name: Build Tauri app
-        run: npm run tauri build
-        timeout-minutes: 30  # 设置超时，避免无限等待
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.platform }}-app
-          path: src-tauri/target/release/bundle/
+          tagName: app-v__VERSION__
+          releaseName: 'App v__VERSION__'
+          releaseBody: 'See the assets to download this version and install.'
+          releaseDraft: false
+          prerelease: false
