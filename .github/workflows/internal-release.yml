@@ -1,3 +1,11 @@
+name: Internal Test Release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - v*
+
 jobs:
   build:
     runs-on: ${{ matrix.os }}
