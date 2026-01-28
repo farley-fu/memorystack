@@ -8,6 +8,7 @@ jobs:
     runs-on: windows-latest
 
     steps:
+      # ---------- Checkout ----------
       - uses: actions/checkout@v4
 
       # ---------- Node ----------
@@ -28,9 +29,23 @@ jobs:
         with:
           targets: x86_64-pc-windows-msvc
 
-      # ---------- MSVC（必须） ----------
+      # ---------- MSVC ----------
       - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@v1
+
+      # ---------- 🔥 关键修复 1：强制 MSVC linker ----------
+      - name: Force MSVC linker
+        run: |
+          echo "CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER=link.exe" >> $env:GITHUB_ENV
+
+      # ---------- 🔥 关键修复 2：移除 MinGW ----------
+      - name: Remove MinGW from PATH
+        run: |
+          echo "Original PATH:"
+          echo $env:PATH
+          $env:PATH = ($env:PATH -split ';' | Where-Object { $_ -notmatch 'mingw' }) -join ';'
+          echo "Cleaned PATH:"
+          echo $env:PATH
 
       # ---------- Tauri CLI v2 ----------
       - name: Install Tauri CLI v2
