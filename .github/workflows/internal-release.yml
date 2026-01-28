@@ -10,16 +10,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Frontend
       - uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      - run: |
+      - name: Build frontend
+        run: |
           npm ci
           npm run build
 
+      # Rust
       - uses: dtolnay/rust-toolchain@stable
 
+      # ✅ 关键一步：安装 Tauri v2 CLI
+      - name: Install cargo-tauri
+        run: cargo install cargo-tauri --locked
+
+      # Build
       - name: Build Tauri App (macOS)
         env:
           TAURI_SKIP_MACOS_SIGN: "true"
@@ -27,6 +35,7 @@ jobs:
           cd src-tauri
           cargo tauri bundle
 
+      # Upload
       - uses: actions/upload-artifact@v4
         with:
           name: memorystack-macos
