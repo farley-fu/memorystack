@@ -1,0 +1,53 @@
+name: Windows Tauri Build
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ---------- Node ----------
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install frontend deps
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build
+
+      # ---------- Rust ----------
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      # ---------- MSVC（必须） ----------
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+
+      # ---------- Tauri CLI v2 ----------
+      - name: Install Tauri CLI v2
+        run: npm install -g @tauri-apps/cli@v2
+
+      - name: Check tauri
+        run: tauri --version
+
+      # ---------- Build ----------
+      - name: Build Tauri App
+        run: |
+          cd src-tauri
+          tauri build
+
+      # ---------- Upload ----------
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: memorystack-windows
+          path: target/release/bundle/**
