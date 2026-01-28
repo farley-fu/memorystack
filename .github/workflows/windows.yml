@@ -64,5 +64,5 @@ jobs:
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: memorystack-windows
-          path: target/release/bundle/**
+          name: memorystack-windows-exe
+          path: src-tauri/target/release/*.exe
