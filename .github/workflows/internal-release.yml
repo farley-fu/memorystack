@@ -1,62 +1,33 @@
-name: Internal Test Release
+name: macOS Test Build
 
 on:
   workflow_dispatch:
-  push:
-    tags:
-      - v*
 
 jobs:
   build:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os:
-          - windows-latest
-          - macos-latest
+    runs-on: macos-latest
 
     steps:
       - uses: actions/checkout@v4
 
-      # ---------- Frontend ----------
       - uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 20
 
       - run: |
           npm ci
           npm run build
 
-      # ---------- Rust ----------
       - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: x86_64-pc-windows-msvc
 
-      # ---------- Windows MSVC ----------
-      - if: matrix.os == 'windows-latest'
-        uses: ilammy/msvc-dev-cmd@v1
-
-      # ---------- macOS ----------
       - name: Build Tauri App (macOS)
-        if: matrix.os == 'macos-latest'
         env:
           TAURI_SKIP_MACOS_SIGN: "true"
         run: |
           cd src-tauri
           cargo tauri bundle
 
-      # ---------- Windows（止血版） ----------
-      - name: Build Tauri App (Windows)
-        if: matrix.os == 'windows-latest'
-        env:
-          RUSTFLAGS: "-C linker=link.exe"
-        run: |
-          cd src-tauri
-          cargo tauri build --no-bundle
-
-      # ---------- Upload ----------
       - uses: actions/upload-artifact@v4
         with:
-          name: memorystack-${{ matrix.os }}
-          path: src-tauri/target/**
+          name: memorystack-macos
+          path: src-tauri/target/release/bundle/
